@@ -8,7 +8,8 @@ import logging
 from notion_client import AsyncClient
 from fastmcp import FastMCP, Context
 from tenacity import retry, stop_after_attempt, wait_exponential
-from models.notion import Database, SearchResults
+import asyncio
+# from models.notion import Database, SearchResults
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -23,25 +24,25 @@ notion_mcp = FastMCP("notion-tools", description="Notion API tools and operation
 
 def get_notion_client(ctx: Context):
     """Get the Notion client from server state"""
-    client = ctx.request_context.get("notion_client")
-    if not client:
-        raise NotionClientError("Notion client not found in request context")
-    return client
-
-
+    return ctx.request_context.lifespan_context.notion_client
 
 @notion_mcp.tool()
 async def list_databases(ctx: Context):
     """List all accessible Notion databases"""
     try:
         client = get_notion_client(ctx)
-        response = await client.search(filter={"property": "object", "value": "database"})
-        databases = response["results"]
-        logger.info(f"Databases: {json.dumps(databases[1], indent=2)}")
-        if not databases:
-            return []
-        return [db  for db in databases]
-      
+        task = asyncio.create_task(client.search(filter={"property": "object", "value": "database"}))
+        ctx.server.state.tasks.add(task)
+        try:
+            response = await task
+            databases = response["results"]
+            logger.info(f"Found {len(databases)} databases")
+            logger.info(f"Databases first response:\n{json.dumps(databases[0], indent=2)}")
+            if not databases:
+                return []
+            return [db for db in databases]
+        finally:
+            ctx.server.state.tasks.discard(task)
     except Exception as e:
         logger.error(f"Error listing databases: {e}")
         raise NotionClientError(f"Failed to list databases: {e}")
@@ -51,41 +52,73 @@ async def get_database(ctx: Context, database_id: str):
     """Get details about a specific Notion database"""
     try:
         client = get_notion_client(ctx)
-        response = await client.databases.retrieve(database_id=database_id)
-        return response
+        task = asyncio.create_task(client.databases.retrieve(database_id=database_id))
+        ctx.server.state.tasks.add(task)
+        try:
+            response = await task
+            logger.info(f"Database {database_id} retrieved")
+            logger.info(f"Database response:\n{json.dumps(response, indent=2)}")
+            return response
+        finally:
+            ctx.server.state.tasks.discard(task)
     except Exception as e:
         logger.error(f"Error getting database {database_id}: {e}")
         raise NotionClientError(f"Failed to get database: {e}")
 
 @notion_mcp.tool()
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def query_database(ctx: Context, database_id: str, filter: dict = None, sorts: list = None, start_cursor: str = None, page_size: int = 100):
     """Query items from a Notion database"""
     try:
         client = get_notion_client(ctx)
-        response = await client.databases.query(
-            database_id=database_id,
-            filter=filter,
-            sorts=sorts,
-            start_cursor=start_cursor,
-            page_size=page_size
-        )
-        return response
+        query_params = {
+            "database_id": database_id,
+            "page_size": page_size
+        }
+        
+        if filter is not None:
+            query_params["filter"] = filter
+        if sorts:
+            query_params["sorts"] = sorts
+        if start_cursor:
+            query_params["start_cursor"] = start_cursor
+            
+        task = asyncio.create_task(client.databases.query(**query_params))
+        ctx.server.state.tasks.add(task)
+        try:
+            response = await task
+            logger.info(f"Query response:\n{json.dumps(response, indent=2)}")
+            return response
+        finally:
+            ctx.server.state.tasks.discard(task)
     except Exception as e:
         logger.error(f"Error querying database {database_id}: {e}")
         raise NotionClientError(f"Failed to query database: {e}")
 
 @notion_mcp.tool()
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-async def create_page(ctx: Context, database_id: str, properties: dict, children: list = None):
+async def get_page(ctx: Context, page_id: str):
+    """Get details about a specific Notion page"""
+    try:
+        client = get_notion_client(ctx)
+        response = await client.pages.retrieve(page_id=page_id)
+        logger.info(f"Page {page_id} retrieved")
+        logger.info(f"Page response:\n{json.dumps(response, indent=2)}")
+        return response
+    except Exception as e:
+        logger.error(f"Error getting page {page_id}: {e}")
+        raise NotionClientError(f"Failed to get page: {e}")
+
+@notion_mcp.tool()
+async def create_page(ctx: Context, database_id: str, properties: dict = None, children: list = None):
     """Create a new page in a database"""
     try:
         client = get_notion_client(ctx)
         page_data = {
-            "parent": {"database_id": database_id},
-            "properties": properties
+            "parent": {"database_id": database_id}
         }
-        if children:
+        
+        if properties is not None:
+            page_data["properties"] = properties
+        if children is not None:
             page_data["children"] = children
             
         response = await client.pages.create(**page_data)
@@ -95,15 +128,20 @@ async def create_page(ctx: Context, database_id: str, properties: dict, children
         raise NotionClientError(f"Failed to create page: {e}")
 
 @notion_mcp.tool()
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-async def update_page(ctx: Context, page_id: str, properties: dict, archived: bool = False):
+async def update_page(ctx: Context, page_id: str, properties: dict = None, archived: bool = False):
     """Update an existing page"""
     try:
         client = get_notion_client(ctx)
+        update_data = {}
+        
+        if properties is not None:
+            update_data["properties"] = properties
+        if archived:
+            update_data["archived"] = archived
+            
         response = await client.pages.update(
             page_id=page_id,
-            properties=properties,
-            archived=archived
+            **update_data
         )
         return response
     except Exception as e:
@@ -111,7 +149,6 @@ async def update_page(ctx: Context, page_id: str, properties: dict, archived: bo
         raise NotionClientError(f"Failed to update page: {e}")
 
 @notion_mcp.tool()
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def get_block_children(ctx: Context, block_id: str, start_cursor: str = None, page_size: int = 100):
     """Get the children blocks of a block"""
     try:
@@ -127,18 +164,23 @@ async def get_block_children(ctx: Context, block_id: str, start_cursor: str = No
         raise NotionClientError(f"Failed to get block children: {e}")
 
 @notion_mcp.tool()
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def search(ctx: Context, query: str = "", filter: dict = None, sort: dict = None, start_cursor: str = None, page_size: int = 100):
     """Search Notion content"""
     try:
         client = get_notion_client(ctx)
-        response = await client.search(
-            query=query,
-            filter=filter,
-            sort=sort,
-            start_cursor=start_cursor,
-            page_size=page_size
-        )
+        search_params = {
+            "query": query,
+            "page_size": page_size
+        }
+        
+        if filter is not None:
+            search_params["filter"] = filter
+        if sort is not None:
+            search_params["sort"] = sort
+        if start_cursor:
+            search_params["start_cursor"] = start_cursor
+            
+        response = await client.search(**search_params)
         return response
     except Exception as e:
         logger.error(f"Error searching Notion: {e}")
