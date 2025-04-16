@@ -23,6 +23,7 @@ from fastmcp.client.transports import (
 from notion_tools import notion_mcp
 from setup_tools import setup_mcp
 from schema_tools import schema_mcp
+from block_tools import block_mcp
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -97,6 +98,7 @@ async def main():
     mcp.mount("notion", notion_mcp)
     mcp.mount("setup", setup_mcp)
     mcp.mount("schema", schema_mcp)
+    mcp.mount("blocks", block_mcp)
     
     # Start server
     transport = os.getenv("TRANSPORT", "sse")
