@@ -9,7 +9,6 @@ from notion_client import AsyncClient
 from fastmcp import FastMCP, Context
 from tenacity import retry, stop_after_attempt, wait_exponential
 import asyncio
-# from models.notion import Database, SearchResults
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -31,18 +30,14 @@ async def list_databases(ctx: Context):
     """List all accessible Notion databases"""
     try:
         client = get_notion_client(ctx)
-        task = asyncio.create_task(client.search(filter={"property": "object", "value": "database"}))
-        ctx.server.state.tasks.add(task)
-        try:
-            response = await task
-            databases = response["results"]
-            logger.info(f"Found {len(databases)} databases")
-            logger.info(f"Databases first response:\n{json.dumps(databases[0], indent=2)}")
-            if not databases:
-                return []
-            return [db for db in databases]
-        finally:
-            ctx.server.state.tasks.discard(task)
+        response = await client.search(filter={"property": "object", "value": "database"})
+        databases = response["results"]
+        logger.info(f"Found {len(databases)} databases")
+        logger.info(f"Databases first response:\n{json.dumps(databases[0], indent=2)}")
+        if not databases:
+            return []
+        return [db  for db in databases]
+      
     except Exception as e:
         logger.error(f"Error listing databases: {e}")
         raise NotionClientError(f"Failed to list databases: {e}")
@@ -52,21 +47,16 @@ async def get_database(ctx: Context, database_id: str):
     """Get details about a specific Notion database"""
     try:
         client = get_notion_client(ctx)
-        task = asyncio.create_task(client.databases.retrieve(database_id=database_id))
-        ctx.server.state.tasks.add(task)
-        try:
-            response = await task
-            logger.info(f"Database {database_id} retrieved")
-            logger.info(f"Database response:\n{json.dumps(response, indent=2)}")
-            return response
-        finally:
-            ctx.server.state.tasks.discard(task)
+        response = await client.databases.retrieve(database_id=database_id)
+        logger.info(f"Database {database_id} retrieved")
+        logger.info(f"Database response:\n{json.dumps(response, indent=2)}")
+        return response
     except Exception as e:
         logger.error(f"Error getting database {database_id}: {e}")
         raise NotionClientError(f"Failed to get database: {e}")
 
 @notion_mcp.tool()
-async def query_database(ctx: Context, database_id: str, filter: dict = None, sorts: list = None, start_cursor: str = None, page_size: int = 100):
+async def query_database(ctx: Context, database_id: str, filter: dict = None, sorts: list = [], start_cursor: str = None, page_size: int = 100):
     """Query items from a Notion database"""
     try:
         client = get_notion_client(ctx)
@@ -82,14 +72,9 @@ async def query_database(ctx: Context, database_id: str, filter: dict = None, so
         if start_cursor:
             query_params["start_cursor"] = start_cursor
             
-        task = asyncio.create_task(client.databases.query(**query_params))
-        ctx.server.state.tasks.add(task)
-        try:
-            response = await task
-            logger.info(f"Query response:\n{json.dumps(response, indent=2)}")
-            return response
-        finally:
-            ctx.server.state.tasks.discard(task)
+        response = await client.databases.query(**query_params)
+        logger.info(f"Query response:\n{json.dumps(response, indent=2)}")
+        return response
     except Exception as e:
         logger.error(f"Error querying database {database_id}: {e}")
         raise NotionClientError(f"Failed to query database: {e}")

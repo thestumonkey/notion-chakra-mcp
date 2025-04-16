@@ -21,9 +21,8 @@ from fastmcp.client.transports import (
 
 # Import MCP servers
 from notion_tools import notion_mcp
-from project_tools import projects_mcp
-from task_tools import tasks_mcp
-from okr_tools import okr_mcp
+from setup_tools import setup_mcp
+from schema_tools import schema_mcp
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -96,9 +95,8 @@ async def main():
     # Mount MCP servers
     logger.info("Mounting MCP servers...")
     mcp.mount("notion", notion_mcp)
-    mcp.mount("projects", projects_mcp)
-    mcp.mount("tasks", tasks_mcp)
-    mcp.mount("okr", okr_mcp)
+    mcp.mount("setup", setup_mcp)
+    mcp.mount("schema", schema_mcp)
     
     # Start server
     transport = os.getenv("TRANSPORT", "sse")

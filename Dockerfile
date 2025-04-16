@@ -8,6 +8,10 @@ RUN pip install uv
 # Copy project files
 COPY requirements.txt .
 COPY src/ src/
+COPY .env .env
+
+# Create data directory
+RUN mkdir -p /app/data
 
 # Install dependencies
 RUN uv pip install --system -r requirements.txt

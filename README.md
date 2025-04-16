@@ -1,53 +1,60 @@
 # Notion Chakra MCP
 
-A FastMCP server implementation for interacting with Notion API, featuring a Chakra UI frontend.
+## Docker Setup
 
-## Features
+### Prerequisites
+- Docker
+- Docker Compose
 
-- Notion API integration using `notion-client`
-- FastMCP server for handling Notion operations
-- Async support with retry mechanisms
-- Comprehensive test suite
-
-## Setup
-
-1. Clone the repository:
-```bash
-git clone git@github.com:thestumonkey/notion-chakra-mcp.git
-cd notion-chakra-mcp
+### Configuration
+1. Create a `.env` file in the project root with your configuration:
+```env
+NOTION_DB_TASKS_DB=your_notion_db_id
+# Add other environment variables as needed
 ```
 
-2. Create and activate a virtual environment:
+2. Create a `data` directory in the project root:
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+mkdir -p data
 ```
 
-3. Install dependencies:
+### Running with Docker Compose
 ```bash
-pip install -r requirements.txt
+# Build and start the container
+docker-compose up --build
+
+# Run in detached mode
+docker-compose up -d
+
+# Override environment variables
+PORT=9000 docker-compose up
 ```
 
-4. Set up environment variables:
+### Running with Docker
 ```bash
-cp .env.example .env
-# Edit .env with your Notion API token and other settings
+# Build the image
+docker build -t notion-chakra-mcp .
+
+# Run the container
+docker run -p 8050:8050 \
+  -v $(pwd)/.env:/app/.env \
+  -v $(pwd)/data:/app/data \
+  notion-chakra-mcp
+
+# Override environment variables
+docker run -p 9000:9000 \
+  -v $(pwd)/.env:/app/.env \
+  -v $(pwd)/data:/app/data \
+  -e PORT=9000 \
+  notion-chakra-mcp
 ```
 
-## Running Tests
+### Environment Variables
+- `NOTION_DB_TASKS_DB`: Notion database ID for tasks
+- `PORT`: Server port (default: 8050)
+- `HOST`: Server host (default: 0.0.0.0)
 
-```bash
-pytest tests/
-```
-
-## Development
-
-The project uses FastMCP for server implementation and pytest for testing. Key components:
-
-- `src/notion_tools.py`: Main Notion API integration tools
-- `tests/`: Test suite for all functionality
-- `main.py`: Server entry point
-
-## License
-
-MIT 
+Environment variables can be set in three ways, in order of precedence:
+1. Command-line overrides (`docker run -e` or environment prefix with `docker-compose up`)
+2. `.env` file
+3. Default values in Dockerfile 
