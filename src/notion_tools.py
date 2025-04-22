@@ -9,6 +9,7 @@ from notion_client import AsyncClient
 from fastmcp import FastMCP, Context
 from tenacity import retry, stop_after_attempt, wait_exponential
 import asyncio
+from models.notion import Database, Page, Block, SearchResults
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -26,25 +27,24 @@ def get_notion_client(ctx: Context):
     return ctx.request_context.lifespan_context.notion_client
 
 @notion_mcp.tool()
-async def list_databases(ctx: Context):
-    """List all accessible Notion databases"""
+async def list_databases(ctx: Context) -> List[Dict[str, str]]:
+    """List all accessible Notion databases with only title and ID."""
     try:
         client = get_notion_client(ctx)
         response = await client.search(filter={"property": "object", "value": "database"})
         databases = response["results"]
-        logger.info(f"Found {len(databases)} databases")
-        logger.info(f"Databases first response:\n{json.dumps(databases[0], indent=2)}")
+        logger.debug(f"Found {len(databases)} databases")
         if not databases:
             return []
-        return [db  for db in databases]
-      
+        # Return only the title and ID of each database
+        return [{"id": db["id"], "title": db["title"][0]["plain_text"]} for db in databases]
     except Exception as e:
         logger.error(f"Error listing databases: {e}")
         raise NotionClientError(f"Failed to list databases: {e}")
 
 @notion_mcp.tool()
-async def get_database(ctx: Context, database_id: str):
-    """Get details about a specific Notion database"""
+async def get_database(ctx: Context, database_id: str) -> Database:
+    """Get details about a specific Notion database."""
     try:
         client = get_notion_client(ctx)
         response = await client.databases.retrieve(database_id=database_id)
@@ -56,8 +56,28 @@ async def get_database(ctx: Context, database_id: str):
         raise NotionClientError(f"Failed to get database: {e}")
 
 @notion_mcp.tool()
-async def query_database(ctx: Context, database_id: str, filter: dict = None, sorts: list = [], start_cursor: str = None, page_size: int = 100):
-    """Query items from a Notion database"""
+async def query_database(ctx: Context, 
+        database_id: str,
+        filter: Optional[Dict[str, Any]] = None,
+        sorts: Optional[List[Dict[str, Any]]] = None,
+        start_cursor: Optional[str] = None,
+        page_size: int = 100
+        ) -> SearchResults:
+    """Query a database with a specified filter.
+    
+    Args:
+        database_id: The ID of the Notion database to query
+        filter: The filter to apply, as a JSON-stringified object
+            Example: "filter": {
+                        "property": "Due date",
+                        "date": {
+                        "on_or_after": "2023-02-08"
+                        }
+                    }
+        sorts: A list of dictionaries defining the sorting criteria for the query
+            [{ "timestamp": "created_time", "direction": "descending" }]
+        start_cursor: A string representing the starting cursor for the query 
+    """
     try:
         client = get_notion_client(ctx)
         query_params = {
@@ -65,8 +85,9 @@ async def query_database(ctx: Context, database_id: str, filter: dict = None, so
             "page_size": page_size
         }
         
-        if filter is not None:
+        if filter:
             query_params["filter"] = filter
+        # Ensure sorts is a list, even if None
         if sorts:
             query_params["sorts"] = sorts
         if start_cursor:
@@ -93,7 +114,11 @@ async def get_page(ctx: Context, page_id: str):
         raise NotionClientError(f"Failed to get page: {e}")
 
 @notion_mcp.tool()
-async def create_page(ctx: Context, database_id: str, properties: dict = None, children: list = None):
+async def create_page(ctx: Context, 
+        database_id: str,
+        properties: Dict[str, Any],
+        children: Optional[List[Dict[str, Any]]] = None
+        ) -> Page:
     """Create a new page in a database"""
     try:
         client = get_notion_client(ctx)
@@ -101,9 +126,9 @@ async def create_page(ctx: Context, database_id: str, properties: dict = None, c
             "parent": {"database_id": database_id}
         }
         
-        if properties is not None:
+        if properties:
             page_data["properties"] = properties
-        if children is not None:
+        if children:
             page_data["children"] = children
             
         response = await client.pages.create(**page_data)
@@ -113,7 +138,11 @@ async def create_page(ctx: Context, database_id: str, properties: dict = None, c
         raise NotionClientError(f"Failed to create page: {e}")
 
 @notion_mcp.tool()
-async def update_page(ctx: Context, page_id: str, properties: dict = None, archived: bool = False):
+async def update_page(ctx: Context, 
+        page_id: str,
+        properties: Dict[str, Any],
+        archived: Optional[bool] = None
+        ) -> Page:
     """Update an existing page"""
     try:
         client = get_notion_client(ctx)
@@ -134,7 +163,11 @@ async def update_page(ctx: Context, page_id: str, properties: dict = None, archi
         raise NotionClientError(f"Failed to update page: {e}")
 
 @notion_mcp.tool()
-async def get_block_children(ctx: Context, block_id: str, start_cursor: str = None, page_size: int = 100):
+async def get_block_children(ctx: Context, 
+        block_id: str,
+        start_cursor: Optional[str] = None, 
+        page_size: int = 100
+        ) -> List[Block]:
     """Get the children blocks of a block"""
     try:
         client = get_notion_client(ctx)
@@ -149,7 +182,13 @@ async def get_block_children(ctx: Context, block_id: str, start_cursor: str = No
         raise NotionClientError(f"Failed to get block children: {e}")
 
 @notion_mcp.tool()
-async def search(ctx: Context, query: str = "", filter: dict = None, sort: dict = None, start_cursor: str = None, page_size: int = 100):
+async def search(ctx: Context, 
+        query: str = "",
+        filter: Optional[Dict[str, Any]] = None,
+        sort: Optional[Dict[str, Any]] = None,
+        start_cursor: Optional[str] = None,
+        page_size: int = 100
+        ) -> SearchResults:
     """Search Notion content"""
     try:
         client = get_notion_client(ctx)

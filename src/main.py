@@ -18,6 +18,7 @@ from fastmcp.client.transports import (
     PythonStdioTransport, 
     FastMCPTransport
 )
+from mcp.server.session import ServerSession
 
 # Import MCP servers
 from notion_tools import notion_mcp
@@ -42,7 +43,6 @@ class NotionContext:
     """Context for the notion tools server"""
     notion_client: AsyncClient
 
-
 @asynccontextmanager
 async def mcp_lifespan(server: FastMCP) -> AsyncIterator[NotionContext]:
     """Manage the lifecycle of the MCP server and its resources"""
@@ -59,6 +59,7 @@ async def mcp_lifespan(server: FastMCP) -> AsyncIterator[NotionContext]:
         if notion_client:
             await notion_client.aclose()
         # Add cleanup for other resources here as needed
+
 # Create main MCP instance
 mcp = FastMCP(
     name="notion-chakra-mcp", 
@@ -102,12 +103,12 @@ async def main():
     
     # Start server
     transport = os.getenv("TRANSPORT", "sse")
-    logger.info("HOST: %s, PORT: %s", os.getenv("HOST", "0.0.0.0"), os.getenv("PORT", "8050"))
     
     try:
         if transport == 'sse':
             # Run the MCP server with sse transport
             logger.info("Starting MCP server with SSE transport...")
+            logger.info("HOST: %s, PORT: %s", os.getenv("HOST", "0.0.0.0"), os.getenv("PORT", "8050"))
             await mcp.run_sse_async()
         else:
             # Run the MCP server with stdio transport

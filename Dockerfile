@@ -1,24 +1,22 @@
 FROM python:3.12-slim
 
 WORKDIR /app
-
-# Install uv
-RUN pip install uv
-
-# Copy project files
-COPY requirements.txt .
-COPY src/ src/
-COPY .env .env
-
 # Create data directory
 RUN mkdir -p /app/data
 
-# Install dependencies
-RUN uv pip install --system -r requirements.txt
 
-# Set environment variables
-ENV PYTHONPATH=/app/src
-ENV PORT=8050
+# Install uv
+# Install uv
+RUN pip install uv
 
-# Run the server
-CMD ["python", "-m", "src.main"] 
+# Copy the MCP server files
+COPY . .
+
+# Install packages
+RUN python -m venv .venv
+RUN uv pip install -e .
+
+EXPOSE ${PORT}
+
+# Command to run the MCP server
+CMD ["uv", "run", "src/main.py"]

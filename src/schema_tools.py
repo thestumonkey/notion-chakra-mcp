@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # Create Schema MCP server
 schema_mcp = FastMCP("schemas", description="Schema management tools")
 
-@schema_mcp.tool()
+# @schema_mcp.tool()
 async def fetch_schemas(ctx: Context, config_name: str = "default") -> Dict[str, Any]:
     """
     Fetch and store schemas for all accessible Notion databases. Check to see if the schemas have already been fetched
@@ -68,8 +68,9 @@ async def fetch_schemas(ctx: Context, config_name: str = "default") -> Dict[str,
         logger.error(f"Error fetching database schemas: {e}")
         raise
 
-@schema_mcp.tool()
-async def get_schema(ctx: Context, database_name: str, config_name: str = "default") -> Optional[Dict[str, Any]]:
+# @schema_mcp.tool()
+async def get_schema(ctx: Context, database_name: str, 
+          config_name: Optional[str] = "default") -> Optional[Dict[str, Any]]:
     """
     Get schema for a specific database, fetching from Notion if not cached.
     
@@ -91,8 +92,9 @@ async def get_schema(ctx: Context, database_name: str, config_name: str = "defau
     schemas = await fetch_schemas(ctx, config_name)
     return schemas.get(database_name)
 
-@schema_mcp.tool()
-async def list_schemas(ctx: Context, config_name: str = "default") -> List[str]:
+# @schema_mcp.tool()
+async def list_schemas(ctx: Context, 
+        config_name: Optional[str] = "default") -> List[str]:
     """
     List all available schemas for a configuration.
     
@@ -107,7 +109,7 @@ async def list_schemas(ctx: Context, config_name: str = "default") -> List[str]:
     logger.info(f"Found {len(schemas)} schemas for config {config_name}")
     return schemas
 
-@schema_mcp.tool()
+# @schema_mcp.tool()
 async def list_configs(ctx: Context) -> List[str]:
     """
     List all available schema configurations.
