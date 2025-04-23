@@ -27,7 +27,7 @@ from schema_tools import schema_mcp
 from block_tools import block_mcp
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Load environment variables
@@ -42,6 +42,7 @@ if not NOTION_TOKEN:
 class NotionContext:
     """Context for the notion tools server"""
     notion_client: AsyncClient
+    memory_client: Client
 
 @asynccontextmanager
 async def mcp_lifespan(server: FastMCP) -> AsyncIterator[NotionContext]:
@@ -51,14 +52,17 @@ async def mcp_lifespan(server: FastMCP) -> AsyncIterator[NotionContext]:
     # Initialize Notion client
     logger.info("Initializing Notion client...")
     notion_client = AsyncClient(auth=NOTION_TOKEN)
+    memory_client = Client(os.getenv("MEM0_SERVER_URL"))
     try:
-        yield NotionContext(notion_client=notion_client)
+        yield NotionContext(notion_client=notion_client, memory_client=memory_client)
     finally:
         logger.info("Cleaning up MCP server resources...")
         # Cleanup Notion client
         if notion_client:
             await notion_client.aclose()
         # Add cleanup for other resources here as needed
+        if memory_client:
+            memory_client.close()
 
 # Create main MCP instance
 mcp = FastMCP(
@@ -66,7 +70,8 @@ mcp = FastMCP(
     description="Notion MCP server for personal knowledge and goal management",
     host=os.getenv("HOST", "0.0.0.0"),
     port=os.getenv("PORT", "8050"),
-    lifespan=mcp_lifespan
+    lifespan=mcp_lifespan,
+    settings={"initialization_timeout": 10.0}  # 10 second timeout
 )
 
 async def cleanup():
