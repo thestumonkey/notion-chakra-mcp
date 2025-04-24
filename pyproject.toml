@@ -11,7 +11,16 @@ dependencies = [
     "fastapi==0.109.0",
     "uvicorn==0.27.0",
     "pydantic>=2.7.0",
-    "pydantic-settings>=2.6.1"
+    "pydantic-settings>=2.6.1",
+    "fastapi>=0.109.0",
+    # OpenTelemetry packages
+    "opentelemetry-api>=1.22.0",
+    "opentelemetry-sdk>=1.22.0",
+    "opentelemetry-instrumentation-fastapi>=0.43b0",
+    "opentelemetry-instrumentation-requests>=0.43b0",
+    "opentelemetry-instrumentation-aiohttp-client>=0.43b0",
+    "opentelemetry-exporter-otlp>=1.22.0",
+    "aiohttp>=3.9.0"
 ]
 
 [build-system]
@@ -23,3 +32,12 @@ allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"] 
+
+[tool.uv]
+dev-dependencies = [
+    "ruff>=0.6.2",
+    "fastapi-cli>=0.0.5",
+]
+
+[tool.poetry.dependencies]
+debugpy = "^1.8.0"

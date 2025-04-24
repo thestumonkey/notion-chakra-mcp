@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional, List
 from dotenv import load_dotenv
 from fastmcp import FastMCP, Context
 
-from common_utils import get_mcp_client, extract_response
+from src.common_utils import get_mcp_client, extract_response
 from schemas.schema_manager import SchemaManager
 
 # Configure logging

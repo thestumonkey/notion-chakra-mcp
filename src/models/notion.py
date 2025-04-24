@@ -109,6 +109,10 @@ class Database(NotionObject):
                 processed_properties[key] = value
         self.properties = processed_properties
 
+    def plain_text_name(self):
+        """Return the name of the database as a string"""
+        return self.title[0].plain_text
+
 class Block(NotionObject):
     """Model for a Notion block."""
     type: str

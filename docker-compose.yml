@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   notion-chakra-mcp:
@@ -14,3 +13,20 @@ services:
       - MEM0_SERVER_URL=${MEM0_SERVER_URL:-http://localhost:8000}
     restart: unless-stopped
     # Any environment variables passed during docker-compose up will override .env values 
+
+    develop:
+      # Create a `watch` configuration to update the app
+      # https://docs.docker.com/compose/file-watch/#compose-watch-versus-bind-mounts
+      watch:
+        # Sync the working directory with the `/app` directory in the container
+        - action: sync
+          path: .
+          target: /app
+          # Exclude the project virtual environment — it could be for a
+          # different platform in the container
+          ignore:
+            - .venv/
+
+        # Rebuild the image if dependencies change by checking uv.lock
+        - action: rebuild
+          path: ./uv.lock

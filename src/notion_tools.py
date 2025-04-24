@@ -9,7 +9,7 @@ from notion_client import AsyncClient, Client
 from fastmcp import FastMCP, Context
 from tenacity import retry, stop_after_attempt, wait_exponential
 import asyncio
-from models.notion import Database, Page, Block, SearchResults
+from src.models.notion import Database, Page, Block, SearchResults
 from fastapi import HTTPException
 from starlette.status import HTTP_400_BAD_REQUEST
 
@@ -44,7 +44,7 @@ def get_notion_client(ctx: Context):
     return ctx.request_context.lifespan_context.notion_client
 
 @notion_mcp.tool()
-async def list_databases(ctx: Context) -> List[Dict[str, str]]:
+async def list_databases(ctx: Context, include_properties: bool = False) -> List[Database]:
     """List all accessible Notion databases with only title and ID."""
     try:
         client = get_notion_client(ctx)
@@ -54,7 +54,10 @@ async def list_databases(ctx: Context) -> List[Dict[str, str]]:
         if not databases:
             return []
         # Return only the title and ID of each database
-        return [{"id": db["id"], "title": db["title"][0]["plain_text"]} for db in databases]
+        if not include_properties:
+            return [{"id": db["id"], "title": db["title"][0]["plain_text"]} for db in databases]
+        else:
+            return databases
     except Exception as e:
         logger.error(f"Error listing databases: {e}")
         error = NotionClientError(f"Failed to list databases: {e}", status_code=HTTP_400_BAD_REQUEST)
